@@ -1,0 +1,27 @@
+version: '3.7'
+services:
+  app:
+    image: http4s-web-novel/http4s-web-novel:latest
+    links:
+      - postgres
+      - openTel
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - openTel
+
+  postgres:
+    image: postgres:14.3
+    restart: always
+    ports:
+    - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    volumes:
+      - ~/pgdata:/var/lib/postgresql/data
+  openTel:
+    image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.51.0
+    ports:
+      - "9411:9411"
