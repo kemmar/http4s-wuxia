@@ -1,7 +1,11 @@
 version: '3.7'
+
+volumes:
+  pgdata:
+
 services:
   app:
-    image: http4s-web-novel/http4s-web-novel:latest
+    image: http4s-web-novel/http4s-web-novel:latest<skipPull>
     links:
       - postgres
       - openTel
@@ -20,7 +24,8 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=postgres
     volumes:
-      - ~/pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
+
   openTel:
     image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.51.0
     ports:

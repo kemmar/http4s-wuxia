@@ -21,17 +21,29 @@ val root = (project in file("."))
       "org.http4s" %% "http4s-blaze-server" % http4sVersion,
       "org.http4s" %% "http4s-blaze-client" % http4sVersion
     ),
+    docker / imageNames := Seq(
+      // Sets the latest tag
+      ImageName(s"${organization.value}/${name.value.toLowerCase}:latest"),
+
+      // Sets a name with a tag that contains the project version
+      ImageName(
+        namespace = Some(organization.value),
+        repository = name.value.toLowerCase,
+        tag = Some(version.value)
+      )
+    ),
     assemblyMergeStrategy in assembly := {
       case PathList("META-INF", _ @ _*) => MergeStrategy.discard
       case _ => MergeStrategy.first
     },
     dockerImageCreationTask := docker.value,
     docker / dockerfile := {
+      // The assembly task generates a fat JAR file
       val artifact: File = assembly.value
       val artifactTargetPath = s"/app/${artifact.name}"
 
       new Dockerfile {
-        from("aa8y/sbt:latest")
+        from("openjdk:8-jre")
         add(artifact, artifactTargetPath)
         entryPoint("java", "-jar", artifactTargetPath)
       }
