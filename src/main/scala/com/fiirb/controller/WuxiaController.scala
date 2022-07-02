@@ -14,12 +14,12 @@ class WuxiaController[F[_] : Concurrent](service: NovelService[F]) extends Contr
 
  case class UriReq(url: String)
 
-  implicit val decoder = jsonOf[F, UriReq]
+  implicit val decoder = jsonOf[F, Seq[UriReq]]
 
   def routes: HttpRoutes[F] = HttpRoutes.of[F] {
     case req @ POST -> Root / "novels" =>
       for {
-        uri <- req.as[UriReq]
+        uri <- req.as[Seq[UriReq]]
         result <- processResponse(service.listNovels(uri.url))(resp => Ok(s"$resp"))
       } yield result
   }

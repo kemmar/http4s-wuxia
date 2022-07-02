@@ -4,8 +4,12 @@ version := "0.1"
 
 scalaVersion := "2.13.8"
 
-val trace4Cats = "0.13.1"
-val http4sVersion = "0.23.12"
+lazy val trace4Cats = "0.13.1"
+lazy val http4sVersion = "0.23.12"
+lazy val DoobieVersion = "1.0.0-RC2"
+lazy val FlywayVersion = "8.5.13"
+lazy val PureConfigVersion = "0.17.1"
+lazy val LogbackVersion = "1.2.3"
 
 val root = (project in file("."))
   .enablePlugins(DockerComposePlugin, DockerPlugin, JavaAgent, JvmPlugin)
@@ -22,6 +26,16 @@ val root = (project in file("."))
       "org.scalactic" %% "scalactic" % "3.2.12",
       "org.scalamock" %% "scalamock" % "5.1.0" % Test,
       "org.scalatest" %% "scalatest" % "3.2.12" % Test,
+
+      "org.tpolecat" %% "doobie-hikari" % DoobieVersion,
+      "org.tpolecat" %% "doobie-postgres" % DoobieVersion,
+      "org.tpolecat" %% "doobie-core" % DoobieVersion,
+      "org.flywaydb" % "flyway-core" % FlywayVersion,
+
+      "com.github.pureconfig" %% "pureconfig" % PureConfigVersion,
+      "com.github.pureconfig" %% "pureconfig-cats-effect" % PureConfigVersion,
+
+      "ch.qos.logback" % "logback-classic" % LogbackVersion,
 
       "io.janstenpickle" %% "trace4cats-http4s-client" % trace4Cats,
       "io.janstenpickle" %% "trace4cats-http4s-server" % trace4Cats,
@@ -51,7 +65,7 @@ val root = (project in file("."))
       )
     ),
     assemblyMergeStrategy in assembly := {
-      case PathList("META-INF", _ @ _*) => MergeStrategy.discard
+      case PathList("META-INF", _@_*) => MergeStrategy.discard
       case _ => MergeStrategy.first
     },
     dockerImageCreationTask := docker.value,

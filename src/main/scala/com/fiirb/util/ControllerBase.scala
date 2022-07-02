@@ -1,5 +1,6 @@
 package com.fiirb.util
 
+import cats.{Applicative, Monad}
 import cats.data.EitherT
 import cats.effect.kernel.Concurrent
 import cats.implicits._

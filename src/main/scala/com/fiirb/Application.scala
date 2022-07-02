@@ -45,7 +45,7 @@ object Application extends ResourceApp.Forever {
       routes = new WuxiaController[G](novelService(client.liftTrace())).routes
 
       _ <- BlazeServerBuilder[F]
-        .bindHttp(8080, "0.0.0.0")
+        .bindHttp(8082, "0.0.0.0")
         .withIdleTimeout(10.minutes)
         .withResponseHeaderTimeout(10.minutes)
         .withHttpApp(
