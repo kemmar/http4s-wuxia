@@ -1,6 +1,5 @@
 package com.fiirb.util
 
-import cats.{Applicative, Monad}
 import cats.data.EitherT
 import cats.effect.kernel.Concurrent
 import cats.implicits._
@@ -16,7 +15,11 @@ trait ControllerBase[F[_]] extends Http4sDsl[F] {
       respIO <-
         respIO
           .map(status)
-          .recover(e => InternalServerError(e.getMessage))
+          .recover{
+            e =>
+              println(e)
+              InternalServerError(e.getMessage)
+          }
       result <- respIO
     } yield result
   }

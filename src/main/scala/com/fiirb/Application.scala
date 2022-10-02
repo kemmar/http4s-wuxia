@@ -1,5 +1,6 @@
 package com.fiirb
 
+import cats.Parallel
 import cats.data.Kleisli
 import com.fiirb.controller.WuxiaController
 import com.fiirb.services.{EpubService, NovelService}
@@ -25,7 +26,7 @@ import scala.concurrent.duration.DurationInt
 
 object Application extends ResourceApp.Forever {
 
-  def novelService[F[_]: Async : Console](client: Client[F]) = new NovelService[F](client, new EpubService[F])
+  def novelService[F[_]: Async : Console : Parallel](client: Client[F]) = new NovelService[F](client, new EpubService[F])
 
   def entryPoint[F[_] : Async](process: TraceProcess): Resource[F, EntryPoint[F]] = {
     for {
@@ -40,7 +41,7 @@ object Application extends ResourceApp.Forever {
     for {
       ep <- entryPoint[F](TraceProcess("trace4cats"))
 
-      client <- BlazeClientBuilder[F].resource
+      client <- BlazeClientBuilder[F].withMaxWaitQueueLimit(1024).resource
 
       routes = new WuxiaController[G](novelService(client.liftTrace())).routes
 
