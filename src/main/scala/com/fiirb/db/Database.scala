@@ -1,17 +1,18 @@
 package com.fiirb.db
 
 import cats.Monad
-import cats.effect.{Async, IO}
-import cats.effect.kernel.{Resource, Sync}
+import cats.effect.{Async, IO, MonadCancelThrow}
+import cats.effect.kernel.{Concurrent, Resource, Sync}
 import com.fiirb.config.DatabaseConfig
 import doobie.hikari.HikariTransactor
 import org.flywaydb.core.Flyway
 
 import scala.concurrent.ExecutionContext
+import scala.util.control.NoStackTrace
 
 object Database {
-  def transactor[F[_]](config: DatabaseConfig, executionContext: ExecutionContext)(implicit contextShift: Async[F]): Resource[F, HikariTransactor[F]] = {
-    HikariTransactor.newHikariTransactor[F](
+  def transactor(config: DatabaseConfig, executionContext: ExecutionContext): Resource[IO, HikariTransactor[IO]] = {
+    HikariTransactor.newHikariTransactor[IO](
       config.driver,
       config.url,
       config.user,
@@ -20,9 +21,9 @@ object Database {
     )
   }
 
-  def initialize[F[_]](transactor: HikariTransactor[F])(implicit F: Monad[F]): F[Unit] = {
+  def initialize(transactor: HikariTransactor[IO]): IO[Unit] = {
     transactor.configure { dataSource =>
-      F.pure {
+      IO {
         val flyWay = Flyway.configure().dataSource(dataSource).load()
         flyWay.migrate()
         ()

@@ -1,10 +1,11 @@
 package com.fiirb.services
 
 import cats.{Applicative, Parallel}
-import cats.effect.{Async, Ref}
+import cats.effect.kernel.Concurrent
+import cats.effect.{MonadCancelThrow, Ref}
 import cats.implicits._
-import com.fiirb.controller.ExternalService
-import com.fiirb.domain.{NovelChapter, NovelInfo}
+import com.fiirb.db.repository.NovelChapterRepo
+import com.fiirb.domain.{ChapterInfo, NovelChapter, NovelInfo}
 import org.http4s.Uri
 import org.http4s.client.Client
 import org.jsoup.Jsoup
@@ -14,17 +15,16 @@ import scala.jdk.CollectionConverters.CollectionHasAsScala
 import scala.util.Try
 import scala.util.control.NonFatal
 
-case class ChapterInfo(title: String, link: String)
-
-class NovelService[F[_] : Async : Applicative : Parallel](client: Client[F], epubService: EpubService[F]) extends ExternalService[F] {
+class NovelService[F[_] : MonadCancelThrow: Concurrent: Parallel](client: Client[F],
+                                                                     epubService: EpubService[F]) extends ExternalService[F] {
 
   private def readPage(uri: Uri): F[String] = {
     client
       .expect[String](uri).recoverWith {
         case NonFatal(error) =>
           for {
-            _ <- Async[F].delay(println(s"Error: ${error.getMessage}"))
-            _ <- Async[F].delay(Thread.sleep(1000))
+            _ <- Applicative[F].pure(println(s"Error: ${error.getMessage}"))
+            _ <- Applicative[F].pure(Thread.sleep(1000))
             retry <- readPage(uri)
           } yield retry
       }
@@ -37,17 +37,19 @@ class NovelService[F[_] : Async : Applicative : Parallel](client: Client[F], epu
 
   private def readTitlePage(page: String): F[NovelInfo] = {
     for {
-      delayed <- Async[F].blocking {
-        val html = Jsoup.parse(page)
+      delayed <- Concurrent[F].fromTry {
+        Try {
+          val html = Jsoup.parse(page)
 
-        val title = html.select("h3.title").text()
+          val title = html.select("h3.title").text()
 
-        val firstChapter = html
-          .select("ul.list-chapter li a")
-          .asScala
-          .headOption.flatMap(s => stringToUri(s.attr("href")))
+          val firstChapter = html
+            .select("ul.list-chapter li a")
+            .asScala
+            .headOption.flatMap(s => stringToUri(s.attr("href")))
 
-        (title, firstChapter)
+          (title, firstChapter)
+        }
       }
 
       (title, firstChapter) = delayed
@@ -57,17 +59,19 @@ class NovelService[F[_] : Async : Applicative : Parallel](client: Client[F], epu
 
   private def listFromPage(page: String): F[Seq[ChapterInfo]] = {
     for {
-      delayed <- Async[F].blocking {
-        val html = Jsoup.parse(page)
+      delayed <- Concurrent[F].fromTry {
+        Try {
+          val html = Jsoup.parse(page)
 
-        html.select("select.chr-jump option").asScala.flatMap { elm =>
-          Try {
-            val title = elm.text()
-            val link = elm.`val`()
+          html.select("select.chr-jump option").asScala.flatMap { elm =>
+            Try {
+              val title = elm.text()
+              val link = elm.`val`()
 
-            ChapterInfo(title, link)
-          }.toOption
-        }.toSeq
+              ChapterInfo(None, title, link)
+            }.toOption
+          }.toSeq
+        }
       }
     } yield delayed
   }
@@ -76,42 +80,45 @@ class NovelService[F[_] : Async : Applicative : Parallel](client: Client[F], epu
     link match {
       case Some(l) =>
         for {
+          _ <- Concurrent[F].pure(())
           page <- readPage(l)
           novelChap <- parsePageToChapter(page)
           nextChapters <- buildNovel(novelChap.nextChapter)
         } yield novelChap +: nextChapters
-      case None => Async[F].pure(Seq.empty[NovelChapter])
+      case None => Concurrent[F].pure(Seq.empty[NovelChapter])
     }
   }
 
-  def f(chapter: ChapterInfo, ref: Ref[F, Seq[NovelChapter]]) = {
+  def f(chapter: (ChapterInfo, Int), ref: Ref[F, Seq[(Int, NovelChapter)]]) = {
     for {
-      page <- readPage(stringToUri(chapter.link).get)
+      page <- readPage(stringToUri(chapter._1.link).get)
       novelChap <- parsePageToChapter(page)
-      update <- ref.update(_ :+ novelChap)
+      update <- ref.update(_ :+ (chapter._2, novelChap))
     } yield update
   }
 
   private def buildNovelFromChapterInfoRef(chapterInfo: Seq[ChapterInfo]): F[Seq[NovelChapter]] = {
 
-    val ref = Ref[F].of(Seq.empty[NovelChapter])
+    val ref = Ref[F].of(Seq.empty[(Int, NovelChapter)])
 
     for {
       r <- ref
-      _ <- chapterInfo.grouped(1000).map(_.map(f(_, r)).parSequence).toList.sequence
+      _ <- chapterInfo.zipWithIndex.grouped(2).map(_.map(f(_, r)).parSequence).toList.sequence
       result <- r.get
-    } yield result
+    } yield result.sortBy(_._1).map(_._2)
   }
 
   private def parsePageToChapter(page: String): F[NovelChapter] = {
-    Async[F].blocking {
-      val html = Jsoup.parse(page)
+    Concurrent[F].fromTry {
+      Try {
+        val html = Jsoup.parse(page)
 
-      val nextChapter = stringToUri(html.getElementById("next_chap").attr("href").trim)
-      val content = html.getElementById("chr-content").select("p").asScala.map(_.html()).mkString("<html><p>", "</p><p>", "</p></html>")
-      val title = html.select("a.chr-title").text()
+        val nextChapter = stringToUri(html.getElementById("next_chap").attr("href").trim)
+        val content = html.getElementById("chr-content").select("p").asScala.map(_.html()).mkString("<html><p>", "</p><p>", "</p></html>")
+        val title = html.select("a.chr-title").text()
 
-      NovelChapter(title, nextChapter = nextChapter, content = content)
+        NovelChapter(title, nextChapter = nextChapter, content = content)
+      }
     }
   }
 

@@ -1,15 +1,18 @@
 package com.fiirb.services
 
-import cats.effect.Async
+
+import cats.Monad
+import cats.effect.MonadCancelThrow
 import com.fiirb.domain.NovelInfo
 import coza.opencollab.epub.creator.EpubConstants
 import coza.opencollab.epub.creator.model.{Content, EpubBook}
 
 import java.io.{File, FileOutputStream}
 import java.text.MessageFormat
+import java.util.UUID
 import scala.util.Try
 
-class EpubService[F[_]: Async] {
+class EpubService[F[_]: MonadCancelThrow] {
 
   def buildBook(info: NovelInfo): F[File] = {
     println(s"Building book base: ${info.title}")
@@ -17,7 +20,7 @@ class EpubService[F[_]: Async] {
     //      book.addCoverImage(info.image,
     //        "image/jpeg", "images/coverImage.jpg")
 
-    Async[F].fromTry {
+    MonadCancelThrow[F].fromTry {
       Try {
         info.chapters.map { chapter =>
           val title = chapter.title
@@ -30,7 +33,7 @@ class EpubService[F[_]: Async] {
 
           val content =
             new Content("application/xhtml+xml",
-              s"html/${book.getTitle}/$title.htm",
+              s"html/${book.getTitle}/${UUID.randomUUID()}.htm",
               formattedContent.getBytes())
 
           content.setId(title)

@@ -9,8 +9,6 @@ import org.http4s.HttpRoutes
 import org.http4s.circe.CirceEntityCodec.circeEntityEncoder
 import org.http4s.circe.jsonOf
 
-trait ExternalService[F[_]]
-
 class WuxiaController[F[_] : Concurrent](service: NovelService[F]) extends ControllerBase[F] {
 
  case class NameReq(name: String)
@@ -23,6 +21,11 @@ class WuxiaController[F[_] : Concurrent](service: NovelService[F]) extends Contr
         nameReq <- req.as[NameReq]
         result <- processResponse(service.findNovelByName(nameReq.name))(resp => Ok(resp.getName))
       } yield result
+//    case req@POST -> Root / "novels" / "persist" =>
+//      for {
+//        nameReq <- req.as[NameReq]
+//        result <- processResponse(service.loadChapterInfo(nameReq.name))(resp => Ok(resp.toList))
+//      } yield result
   }
 
 }
